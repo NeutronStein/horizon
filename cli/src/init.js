@@ -1,8 +1,12 @@
+/* global require, module */
+
 'use strict';
 
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
+const process = require('process');
+const { checkProjectName } = require('./utils/check-project-name.js');
 
 const makeIndexHTML = (projectName) => `\
 <!doctype html>
@@ -142,25 +146,31 @@ const fileExists = (pathName) => {
 const processConfig = (parsed) => parsed;
 
 const runCommand = (parsed) => {
-  const runInSubdir = parsed.projectName != null;
+  let projectName, dirName, chdirTo;
+  try {
+    const check = checkProjectName(parsed.projectName);
+    projectName = check.projectName;
+    dirName = check.dirName;
+    chdirTo = check.chdirTo;
+  } catch (e) {
+    console.log(`Invalid characters in project name: ${e.message}`);
+    process.exit(1);
+  }
+  const runInSubdir = chdirTo !== '.';
   const subdirExists = !runInSubdir || fileExists(parsed.projectName);
-  const projectDirName = parsed.projectName ?
-          path.join(process.cwd(), parsed.projectName) :
-          process.cwd();
-  const projectName = parsed.projectName || path.basename(process.cwd());
 
   if (runInSubdir) {
     if (!subdirExists) {
-      fs.mkdirSync(projectName);
-      console.info(`Created new project directory ${parsed.projectName}`);
+      fs.mkdirSync(dirName);
+      console.info(`Created new project directory ${dirName}`);
     } else {
-      console.info(`Initializing in existing directory ${parsed.projectName}`);
+      console.info(`Initializing in existing directory ${dirName}`);
     }
   } else {
     console.info('Creating new project in current directory');
   }
   if (runInSubdir) {
-    process.chdir(projectDirName);
+    process.chdir(chdirTo);
   }
 
   // Before we create things, check if the directory is empty
@@ -169,7 +179,7 @@ const runCommand = (parsed) => {
   if (!dirWasPopulated && !fileExists('src')) {
     fs.mkdirSync('src');
     if (runInSubdir) {
-      console.info(`Created ${parsed.projectName}/src directory`);
+      console.info(`Created ${dirName}/src directory`);
     } else {
       console.info('Created src directory');
     }
@@ -177,14 +187,14 @@ const runCommand = (parsed) => {
   if (!dirWasPopulated && !fileExists('dist')) {
     fs.mkdirSync('dist');
     if (runInSubdir) {
-      console.info(`Created ${parsed.projectName}/dist directory`);
+      console.info(`Created ${dirName}/dist directory`);
     } else {
       console.info('Created dist directory');
     }
 
     fs.appendFileSync('./dist/index.html', makeIndexHTML(projectName));
     if (runInSubdir) {
-      console.info(`Created ${parsed.projectName}/dist/index.html example`);
+      console.info(`Created ${dirName}/dist/index.html example`);
     } else {
       console.info('Created dist/index.html example');
     }
@@ -193,7 +203,7 @@ const runCommand = (parsed) => {
   if (!fileExists('.hz')) {
     fs.mkdirSync('.hz');
     if (runInSubdir) {
-      console.info(`Created ${parsed.projectName}/.hz directory`);
+      console.info(`Created ${dirName}/.hz directory`);
     } else {
       console.info('Created .hz directory');
     }
@@ -205,7 +215,7 @@ const runCommand = (parsed) => {
                    // read/write only
     });
     if (runInSubdir) {
-      console.info(`Created ${parsed.projectName}/.hz/config.toml`);
+      console.info(`Created ${dirName}/.hz/config.toml`);
     } else {
       console.info('Created .hz/config.toml');
     }
